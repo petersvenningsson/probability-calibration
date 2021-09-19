@@ -1,1 +1,1 @@
-from .utils import confidence_ellipse
+from .utils import confidence_ellipse, InverseEntropy

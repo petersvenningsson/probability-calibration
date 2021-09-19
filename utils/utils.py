@@ -1,10 +1,10 @@
-# Sourced from https://gist.github.com/CarstenSchelp/b992645537660bda692f218b562d0712
-# Will be included in future version of plt
+from math import e
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import matplotlib.transforms as transforms
-
+from scipy import stats
 
 def confidence_ellipse(mean, cov, ax, n_std=3.0, facecolor="none", **kwargs):
     """
@@ -41,3 +41,27 @@ def confidence_ellipse(mean, cov, ax, n_std=3.0, facecolor="none", **kwargs):
 
     ellipse.set_transform(transf + ax.transData)
     return ax.add_patch(ellipse)
+
+
+
+class InverseEntropy:
+    def __init__(self):
+        
+        confidence = np.linspace(0.5, 1, num=10000)
+        entropy = stats.entropy(np.stack((confidence, 1-confidence)), base=e, axis=0)
+        self.inverse = np.stack((entropy, confidence)).T
+    
+    def inverse_entropy(self, entropy):
+        if isinstance(entropy, np.ndarray):
+            entropy = entropy.squeeze()
+            confidence = []
+            for value in entropy:
+                index = np.abs(self.inverse[:,0] - value).argmin()
+                confidence.append(self.inverse[index,1])
+            confidence = np.array(confidence)
+        else:
+            index = np.abs(self.inverse[:,0] - entropy).argmin()
+            confidence = self.inverse[index,1]
+        return confidence 
+        
+        

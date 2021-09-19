@@ -6,10 +6,15 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import OneHotEncoder
+from scipy import stats
+from math import e
+
 import pandas as pd
 
-class_set = 2
+import utils
 
+class_set = 2
+entropy_inv = utils.InverseEntropy()
 
 class ClassifierComposition:
     """ A composition of a generative model and a discriminant model
@@ -40,7 +45,7 @@ class ClassifierComposition:
 
 
     def fit(self, df):
-
+        self.training_df = df
         self.model.fit(df)
         self.generative_model.fit(df)
 
@@ -53,29 +58,63 @@ class ClassifierComposition:
         return self.model.predict(df)
 
 
-    def information(self, belief, n=1000, espilon = 0.00001):
+    def _information(self, belief, n=1000, espilon = 0.00001):
 
-        theta_ = self.generative_model.model.theta_
-        sigma_ = self.generative_model.model.sigma_
+        # If Gaussian model then the generative model can be sampled. Else the training dataset is sampled.
+        if self.discriminant_model == 'Gaussian':
+            theta_ = self.generative_model.model.theta_
+            sigma_ = self.generative_model.model.sigma_
 
-        class_sample = np.random.choice(list(range(class_set)), n, p=belief.squeeze())
+            class_sample = np.random.choice(list(range(class_set)), n, p=belief.squeeze())
 
-        means = np.array(list(map(lambda x: theta_[x,:], class_sample)))
-        std = np.sqrt(np.array(list(map(lambda x: sigma_[x,:], class_sample))))
+            means = np.array(list(map(lambda x: theta_[x,:], class_sample)))
+            std = np.sqrt(np.array(list(map(lambda x: sigma_[x,:], class_sample))))
 
-        X = np.random.standard_normal((n, len(self.features)))
-        X = X*std + means
+            X = np.random.standard_normal((n, len(self.features)))
+            X = X*std + means
 
-        rows = dict(zip(self.features, X.T))
-        rows['lable'] = class_sample
-        sample_probability = np.log(self.predict_proba(pd.DataFrame(rows)) + espilon)
+            rows = dict(zip(self.features, X.T))
+            rows['lable'] = class_sample
+            sample_probability = np.log(self.predict_proba(pd.DataFrame(rows)) + espilon)
 
-        enumerator = np.take_along_axis(sample_probability, class_sample[:,None], axis=1).squeeze()
-        denomonator = logsumexp((sample_probability + np.repeat(np.log(belief), n, axis=1).T), axis=1).squeeze()
+            enumerator = np.take_along_axis(sample_probability, class_sample[:,None], axis=1).squeeze()
+            denomonator = logsumexp((sample_probability + np.repeat(np.log(belief), n, axis=1).T), axis=1).squeeze()
 
-        information = np.mean(enumerator - denomonator)
+            _information = enumerator - denomonator
 
-        return information
+        else:
+            samples = self.training_df.groupby('lable', group_keys=False).apply(lambda x: x.sample(int(n/belief.size), replace=True))
+
+            sample_probability = np.log(self.predict_proba(samples[self.features]) + espilon)
+
+            enumerator = np.take_along_axis(sample_probability, (samples['lable'].to_numpy().astype(int))[:,None], axis=1).squeeze()
+            denomonator = logsumexp((sample_probability + np.repeat(np.log(belief), n, axis=1).T), axis=1).squeeze()
+
+            _information = enumerator - denomonator
+
+        return _information
+
+
+    def expected_confidence(self, belief, n=1000):
+        samples = self.training_df.groupby('lable', group_keys=False).apply(lambda x: x.sample(int(n/belief.size), replace=True))
+        sample_probability = self.predict_proba(samples[self.features])
+        mean_confidence = np.mean(np.max(sample_probability, axis=1))
+        return mean_confidence
+
+
+
+    def information(self, args, **kwargs):
+        return np.mean(self._information(*args, **kwargs))
+
+
+    def expected_accuracy(self, belief, n=1000, espilon = 0.00001):
+        initial_entropy = stats.entropy(belief, base=e)
+        information_samples = self._information(belief, n, espilon)
+        posterior_entropy_sampels = initial_entropy - information_samples
+
+        confidences = entropy_inv.inverse_entropy(posterior_entropy_sampels)
+
+        return np.mean(confidences)
 
 
 class LogisticReg(LogisticRegression):

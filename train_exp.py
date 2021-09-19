@@ -9,6 +9,7 @@ from sklearn.calibration import calibration_curve
 
 import classifiers
 import expdataset
+import utils
 
 n_classes = 2
 max_sensors = 5
@@ -100,25 +101,51 @@ def evaluate_classifier(classifiers, goal_entropy, test_df):
     lables = test_df['lable'].to_numpy()
     accuracy = accuracy_score(predictions + 1, lables)
 
-    return np.mean(entropy), selected_number_sensors, accuracy, posteriors, lables
+    return np.mean(entropy), selected_number_sensors, accuracy, posteriors, lables, expected_posterior_entropy[selected_number_sensors-1]
 
 
 def evaluate_classifiers():
-    goal_entropy = 0.1 # 2 vad bra
+
     uncalibrated_classifiers, sigmoid_calibrated_classifiers, isotonic_calibrated_classifiers = get_classifiers()
     _, test_df, feature_names = expdataset.get_dataset(n_sensors=5)
 
-    df = test_df.copy()
-    uncalibrated_mean_entropy, uncalibrated_selected_number_sensors, uncalibrated_accuracy, _, _ = evaluate_classifier(uncalibrated_classifiers, goal_entropy, df)
-    df = test_df.copy()
-    sigmoid_mean_entropy, sigmoid_selected_number_sensors, sigmoid_accuracy,_,_ = evaluate_classifier(sigmoid_calibrated_classifiers, goal_entropy, df)
-    df = test_df.copy()
-    isotonic_mean_entropy, isotonic_selected_number_sensors, isotonic_accuracy,_,_ = evaluate_classifier(isotonic_calibrated_classifiers, goal_entropy, df)
+
+
+    rows = []
+    for goal_entropy in np.linspace(0.1, 0.65, num=100):
+        entropy_inv = utils.InverseEntropy()
+        goal_accuracy = entropy_inv.inverse_entropy(goal_entropy)
+        print(f'Goal accuracy: {goal_accuracy}, Goal entropy: {goal_entropy}')
+        df = test_df.copy()
+        uncalibrated_mean_entropy, uncalibrated_selected_number_sensors, uncalibrated_accuracy, _, _, uncalibrated_expected_posterior_entropy = evaluate_classifier(uncalibrated_classifiers, goal_entropy, df)
+        df = test_df.copy()
+        sigmoid_mean_entropy, sigmoid_selected_number_sensors, sigmoid_accuracy, _, _, sigmoid_expected_posterior_entropy = evaluate_classifier(sigmoid_calibrated_classifiers, goal_entropy, df)
+        df = test_df.copy()
+        isotonic_mean_entropy, isotonic_selected_number_sensors, isotonic_accuracy, _, _, isotonic_expected_posterior_entropy = evaluate_classifier(isotonic_calibrated_classifiers, goal_entropy, df)
+        
+        
+        rows.append({'Quantity': 'Realized accuracy', 'Calibration': 'Isotonic regression', 'Selected number of sensors':isotonic_selected_number_sensors,'Accuracy':isotonic_accuracy, 'Mean posterior entropy': isotonic_mean_entropy, 'Goal accuracy': goal_accuracy })
+        rows.append({'Quantity': 'Realized accuracy', 'Calibration': 'Logistic regression', 'Selected number of sensors':sigmoid_selected_number_sensors,'Accuracy':sigmoid_accuracy, 'Mean posterior entropy': sigmoid_mean_entropy, 'Goal accuracy': goal_accuracy })
+        rows.append({'Quantity': 'Realized accuracy', 'Calibration': 'Uncalibrated', 'Selected number of sensors':uncalibrated_selected_number_sensors,'Accuracy':uncalibrated_accuracy, 'Mean posterior entropy': uncalibrated_mean_entropy, 'Goal accuracy': goal_accuracy })
+
+        rows.append({'Quantity': 'Expected accuracy', 'Calibration': 'Isotonic regression', 'Selected number of sensors':isotonic_selected_number_sensors,'Accuracy':entropy_inv.inverse_entropy(isotonic_expected_posterior_entropy), 'Mean posterior entropy': isotonic_mean_entropy, 'Goal accuracy': goal_accuracy })
+        rows.append({'Quantity': 'Expected accuracy', 'Calibration': 'Logistic regression', 'Selected number of sensors':sigmoid_selected_number_sensors,'Accuracy':entropy_inv.inverse_entropy(sigmoid_expected_posterior_entropy), 'Mean posterior entropy': sigmoid_mean_entropy, 'Goal accuracy': goal_accuracy })
+        rows.append({'Quantity': 'Expected accuracy', 'Calibration': 'Uncalibrated', 'Selected number of sensors':uncalibrated_selected_number_sensors,'Accuracy':entropy_inv.inverse_entropy(uncalibrated_expected_posterior_entropy), 'Mean posterior entropy': uncalibrated_mean_entropy, 'Goal accuracy': goal_accuracy })
+
+        rows.append({'Quantity': 'Predicted accuracy', 'Calibration': 'Isotonic regression', 'Selected number of sensors':isotonic_selected_number_sensors,'Accuracy':entropy_inv.inverse_entropy(isotonic_mean_entropy), 'Mean posterior entropy': isotonic_mean_entropy, 'Goal accuracy': goal_accuracy })
+        rows.append({'Quantity': 'Predicted accuracy', 'Calibration': 'Logistic regression', 'Selected number of sensors':sigmoid_selected_number_sensors,'Accuracy':entropy_inv.inverse_entropy(sigmoid_mean_entropy), 'Mean posterior entropy': sigmoid_mean_entropy, 'Goal accuracy': goal_accuracy })
+        rows.append({'Quantity': 'Predicted accuracy', 'Calibration': 'Uncalibrated', 'Selected number of sensors':uncalibrated_selected_number_sensors,'Accuracy':entropy_inv.inverse_entropy(uncalibrated_mean_entropy), 'Mean posterior entropy': uncalibrated_mean_entropy, 'Goal accuracy': goal_accuracy })
+
+    df = pd.DataFrame(rows)
+
+    sns.lineplot(data=df, x = 'Goal accuracy', y='Accuracy', markers=False, hue='Calibration', style="Quantity")
+    plt.plot([0, 1], [0, 1], "k:", label="Ideal calibration")
+    plt.show()
 
     print('s')
 
 
 
 if __name__=='__main__':
-    # evaluate_classifiers()
-    render_reliability()
+    evaluate_classifiers()
+    # render_reliability()
