@@ -103,7 +103,7 @@ def get_classifiers(sensor_correlation = 0.4, feature_correlation = 0):
     return uncalibrated_classifiers, sigmoid_calibrated_classifiers, isotonic_calibrated_classifiers
 
 
-def evaluate_classifier(classifiers, sensor_correlation, goal_accuracy):
+def evaluate_classifier(classifiers, sensor_correlation, goal_accuracy, dataset = None):
     initial_entropy = np.log(n_classes)
 
     # Decide how many sensors should be used
@@ -118,10 +118,11 @@ def evaluate_classifier(classifiers, sensor_correlation, goal_accuracy):
     
     classifier = classifiers[selected_number_sensors][0]
     # Evaluate on test dataset
-
-    dataset, _ = simdataset.get_dataset(sensor_correlation = sensor_correlation, n_sensors = selected_number_sensors, n_total_samples=test_dataset_samples)
+    
+    if dataset is None:
+        dataset, _ = simdataset.get_dataset(sensor_correlation = sensor_correlation, n_sensors = selected_number_sensors, n_total_samples=test_dataset_samples)
+    
     posteriors = classifier.predict_proba(dataset)
-
     entropy = stats.entropy(posteriors, base=e, axis=1)
 
     # Evaluate accuracy on test set
@@ -130,6 +131,39 @@ def evaluate_classifier(classifiers, sensor_correlation, goal_accuracy):
     accuracy = accuracy_score(predictions, dataset['lable'].to_numpy())
 
     return entropy, selected_number_sensors, accuracy, posteriors, lables, expected_accuracy[selected_number_sensors-1]
+
+
+def evaluate_goal_accuracy(file_name):
+
+    sensor_correlation = 0.2
+    uncalibrated_classifiers, sigmoid_calibrated_classifiers, isotonic_calibrated_classifiers = get_classifiers(sensor_correlation = sensor_correlation, feature_correlation = None)
+    dataset, _ = simdataset.get_dataset(sensor_correlation = sensor_correlation, n_sensors = selected_number_sensors, n_total_samples=test_dataset_samples)
+
+    rows = []
+    for goal_accuracy in np.linspace(0.5, 1, num=100):
+        print(f'Goal accuracy: {goal_accuracy}, Goal entropy: {goal_entropy}')
+
+        uncalibrated_mean_entropy, uncalibrated_selected_number_sensors, uncalibrated_accuracy, uncalibrated_posterior, _, uncalibrated_expected_accuracy = evaluate_classifier(uncalibrated_classifiers, sensor_correlation, goal_accuracy, dataset)
+        sigmoid_mean_entropy, sigmoid_selected_number_sensors, sigmoid_accuracy, sigmoid_posterior, _,  sigmoid_expected_accuracy = evaluate_classifier(sigmoid_calibrated_classifiers, sensor_correlation, goal_accuracy, dataset)
+        isotonic_mean_entropy, isotonic_selected_number_sensors, isotonic_accuracy, isotonic_posterior, _, isotonic_expected_accuracy = evaluate_classifier(isotonic_calibrated_classifiers, sensor_correlation, goal_accuracy, dataset)
+        
+        rows.append({'Quantity': 'Realized accuracy', 'Calibration': 'Isotonic regression', 'Selected number of sensors':isotonic_selected_number_sensors,'Accuracy':isotonic_accuracy, 'Mean posterior entropy': isotonic_mean_entropy, 'Sensor correlation': sensor_correlation , 'Goal accuracy': goal_accuracy})
+        rows.append({'Quantity': 'Realized accuracy', 'Calibration': 'Logistic regression', 'Selected number of sensors':sigmoid_selected_number_sensors,'Accuracy':sigmoid_accuracy, 'Mean posterior entropy': sigmoid_mean_entropy, 'Sensor correlation': sensor_correlation , 'Goal accuracy': goal_accuracy})
+        rows.append({'Quantity': 'Realized accuracy', 'Calibration': 'Uncalibrated', 'Selected number of sensors':uncalibrated_selected_number_sensors,'Accuracy':uncalibrated_accuracy, 'Mean posterior entropy': uncalibrated_mean_entropy, 'Sensor correlation': sensor_correlation , 'Goal accuracy': goal_accuracy})
+
+        rows.append({'Quantity': 'Expected accuracy', 'Calibration': 'Isotonic regression', 'Selected number of sensors':isotonic_selected_number_sensors,'Accuracy':isotonic_expected_accuracy, 'Mean posterior entropy': isotonic_mean_entropy, 'Sensor correlation': sensor_correlation , 'Goal accuracy': goal_accuracy})
+        rows.append({'Quantity': 'Expected accuracy', 'Calibration': 'Logistic regression', 'Selected number of sensors':sigmoid_selected_number_sensors,'Accuracy':sigmoid_expected_accuracy, 'Mean posterior entropy': sigmoid_mean_entropy, 'Sensor correlation': sensor_correlation , 'Goal accuracy': goal_accuracy})
+        rows.append({'Quantity': 'Expected accuracy', 'Calibration': 'Uncalibrated', 'Selected number of sensors':uncalibrated_selected_number_sensors,'Accuracy':uncalibrated_expected_accuracy, 'Mean posterior entropy': uncalibrated_mean_entropy, 'Sensor correlation': sensor_correlation , 'Goal accuracy': goal_accuracy})
+
+    df = pd.DataFrame(rows)
+    pickle.dump( df, open( 'accuracy_goal_accuracy' + file_name, "wb" ) )
+
+    sns.lineplot(data=df, x = 'Goal accuracy', y='Accuracy', markers=False, hue='Calibration', style="Quantity")
+    plt.plot([0, 1], [0, 1], "k:", label="Ideal calibration")
+    plt.show()
+
+    print('s')
+
 
 
 def evaluate_classifiers(file_name):
@@ -175,7 +209,7 @@ def evaluate_classifiers(file_name):
 
 if __name__=='__main__':
     file_name = 'Uncorrelated.df'
-    evaluate_classifiers(file_name)
+    evaluate_goal_accuracy(file_name)
     # render_reliability()
     # evaluate_n_sensors()
     # Anteckningar från meeting with nicolas. 
