@@ -222,10 +222,32 @@ def render_goal_accuracy():
     plt.tight_layout()
     plt.show()
 
+
+
+def render_correlation():
+    df = pickle.load( open( '_Uncorrelated.df', 'rb' ) )
+    df.loc[df.Quantity=='Realized accuracy','Quantity'] = 'Accuracy'
+    df.loc[df.Quantity=='Expected accuracy','Quantity'] = 'Expected confidence'
+    df = df.loc[df.Quantity!='Predicted accuracy']
+
+    # Add diagonal line
+    _df = pd.DataFrame([{'Quantity': 'Goal confidence', 'Accuracy':goal_accuracy, 'Sensor correlation': 0, 'Calibration': 'N/A'},{'Quantity': 'Goal confidence', 'Accuracy':goal_accuracy, 'Sensor correlation': 1,'Calibration': 'N/A'}])
+    df = df.append(_df)
+
+    sns.lineplot(data=df, x = 'Sensor correlation', y='Accuracy', markers=False, palette=[*sns.color_palette()[0:3], 'k'], hue='Calibration', style="Quantity")
+    plt.tight_layout()
+    plt.show()
+
+    sns.lineplot(data=df, x = 'Sensor correlation', y='Selected number of sensors', markers=False, dashes=False, hue='Calibration', style="Calibration")
+    plt.show()
+    plt.tight_layout()
+    plt.show()
+
 if __name__=='__main__':
-    render_goal_accuracy()
-    file_name = 'uncorrelated.df'
-    evaluate_goal_accuracy(file_name)
+    render_correlation()
+    # render_goal_accuracy()
+    # file_name = 'uncorrelated.df'
+    # evaluate_goal_accuracy(file_name)
     # evaluate_classifiers(file_name)
     # render_reliability()
     # evaluate_n_sensors()
