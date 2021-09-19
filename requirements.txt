@@ -1,4 +1,4 @@
-seaborn==0.12.0
+seaborn
 scipy==1.6.1
 matplotlib==3.3.2
 pandas==1.2.3
