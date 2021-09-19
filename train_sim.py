@@ -207,7 +207,23 @@ def evaluate_classifiers(file_name):
     plt.show()
 
 
+def render_goal_accuracy():
+
+    df = pickle.load( open( 'accuracy_goal_accuracyuncorrelated.df', 'rb' ) )
+    df.loc[df.Quantity=='Realized accuracy','Quantity'] = 'Accuracy'
+    df.loc[df.Quantity=='Expected accuracy','Quantity'] = 'Expected confidence'
+
+    # Add diagonal line
+    _df = pd.DataFrame([{'Quantity': 'Ideal confidence', 'Accuracy':0, 'Goal accuracy': 0, 'Calibration': 'N/A'},{'Quantity': 'Ideal confidence', 'Accuracy':1, 'Goal accuracy': 1,'Calibration': 'N/A'}])
+    df = df.append(_df)
+
+    sns.lineplot(data=df, x = 'Goal accuracy', y='Accuracy', markers=False, palette=[*sns.color_palette()[0:3], 'k'], hue='Calibration', style="Quantity")
+    # plt.plot([0, 1], [0, 1], "k:", label="Ideal calibration")
+    plt.tight_layout()
+    plt.show()
+
 if __name__=='__main__':
+    render_goal_accuracy()
     file_name = 'uncorrelated.df'
     evaluate_goal_accuracy(file_name)
     # evaluate_classifiers(file_name)
