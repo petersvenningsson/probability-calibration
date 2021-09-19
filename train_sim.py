@@ -137,7 +137,7 @@ def evaluate_goal_accuracy(file_name):
 
     sensor_correlation = 0.2
     uncalibrated_classifiers, sigmoid_calibrated_classifiers, isotonic_calibrated_classifiers = get_classifiers(sensor_correlation = sensor_correlation, feature_correlation = None)
-    dataset, _ = simdataset.get_dataset(sensor_correlation = sensor_correlation, n_sensors = selected_number_sensors, n_total_samples=test_dataset_samples)
+    dataset, _ = simdataset.get_dataset(sensor_correlation = sensor_correlation, n_sensors = max_sensors, n_total_samples=test_dataset_samples)
 
     rows = []
     for goal_accuracy in np.linspace(0.5, 1, num=100):
@@ -168,7 +168,7 @@ def evaluate_goal_accuracy(file_name):
 
 def evaluate_classifiers(file_name):
     
-    feature_correlation = None #0.1
+    feature_correlation = 1 #0.1
     rows = []
     for sensor_correlation in np.linspace(0, 0.6, num=50):
         print(f'Sensor correlation: {sensor_correlation}')
@@ -208,8 +208,9 @@ def evaluate_classifiers(file_name):
 
 
 if __name__=='__main__':
-    file_name = 'Uncorrelated.df'
+    file_name = 'uncorrelated.df'
     evaluate_goal_accuracy(file_name)
+    # evaluate_classifiers(file_name)
     # render_reliability()
     # evaluate_n_sensors()
     # Anteckningar från meeting with nicolas. 
